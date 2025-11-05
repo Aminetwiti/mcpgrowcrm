@@ -1,225 +1,143 @@
 # GROWCRM MCP Server
 
-[![Smithery](https://smithery.ai/badge/@growcrm/mcp-server)](https://smithery.ai/server/@growcrm/mcp-server)
-[![NPM Version](https://img.shields.io/npm/v/@growcrm/mcp-server)](https://www.npmjs.com/package/@growcrm/mcp-server)
+[![NPM Version](https://img.shields.io/npm/v/growcrm-mcp-server)](https://www.npmjs.com/package/growcrm-mcp-server)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Complete Model Context Protocol (MCP) server for GROWCRM - Manage your entire CRM through AI assistants like Claude, ChatGPT, and other MCP-compatible tools.
 
-## 🚀 Features
+## 🚀 Quick Start
 
-**35 AI-Powered Tools** organized across 8 categories:
+### Installation for Claude Desktop
 
-### 🧑‍💼 Client Management (5 tools)
-- List, get, create, update, and delete clients
-- Full client lifecycle management
-- Search and filter capabilities
+Add this configuration to your Claude Desktop config file:
 
-### 📁 Project Management (5 tools)
-- Complete project CRUD operations
-- Project tracking and status updates
-- Client-project relationships
+**Location:**
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
 
-### ✏️ Task Management (5 tools)
-- Task creation and tracking
-- Status updates and assignments
-- Project-task associations
-
-### 💰 Invoicing (4 tools)
-- Invoice generation and management
-- Status tracking (draft, sent, paid)
-- Client billing integration
-
-### 🎯 Lead Management (4 tools)
-- Lead tracking and qualification
-- Lead-to-client conversion
-- Sales pipeline management
-
-### 🎫 Support Tickets (4 tools)
-- Ticket creation and tracking
-- Status management
-- Customer support workflow
-
-### 📋 Estimates, Expenses & Contracts (7 tools)
-- Estimate creation and conversion to invoices
-- Expense tracking and management
-- Contract lifecycle management
-
-### 📊 Dashboard (1 tool)
-- Real-time statistics and KPIs
-- Business overview and metrics
-
-## 📦 Installation
-
-### Via Smithery
-
-To install GROWCRM MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@growcrm/mcp-server):
-
-```bash
-npx -y @smithery/cli install @growcrm/mcp-server --client claude
-```
-
-### Via NPX (Recommended)
-
-```bash
-npx -y @growcrm/mcp-server
-```
-
-### Via NPM
-
-```bash
-npm install -g @growcrm/mcp-server
-```
-
-### Via Docker
-
-```bash
-docker pull growcrm/mcp-server:latest
-docker run -e GROWCRM_API_URL=your_url -e GROWCRM_API_TOKEN=your_token growcrm/mcp-server
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-Create a `.env` file with:
-
-```env
-GROWCRM_API_URL=https://your-growcrm-instance.com/api/v1
-GROWCRM_API_TOKEN=your_sanctum_bearer_token
-```
-
-### Claude Desktop Configuration
-
-Add to your `claude_desktop_config.json`:
-
+**Configuration:**
 ```json
 {
   "mcpServers": {
     "growcrm": {
       "command": "npx",
-      "args": ["-y", "@growcrm/mcp-server"],
+      "args": ["-y", "growcrm-mcp-server"],
       "env": {
-        "GROWCRM_API_URL": "https://your-growcrm-instance.com/api/v1",
-        "GROWCRM_API_TOKEN": "your_token_here"
+        "GROWCRM_API_URL": "https://app.ty-dev.fr/api/v1",
+        "GROWCRM_API_TOKEN": "YOUR_TOKEN_HERE"
       }
     }
   }
 }
 ```
 
-## 🎯 Quick Start
+Get your API token from GROWCRM Settings → API.
 
-1. **Generate API Token** in your GROWCRM instance:
-   ```bash
-   php artisan tinker
-   $user = User::find(1);
-   $token = $user->createToken('mcp-server')->plainTextToken;
-   echo $token;
-   ```
+## 📦 Alternative Installation Methods
 
-2. **Configure MCP Server** with your credentials
+### Via NPM
+```bash
+npm install -g growcrm-mcp-server
+growcrm-mcp-server
+```
 
-3. **Start Using** through your AI assistant:
-   - "List all my clients"
-   - "Create a new project for client #5"
-   - "Show me today's tasks"
-   - "Generate an invoice for client Acme Corp"
+### Via NPX (Direct)
+```bash
+npx -y growcrm-mcp-server
+```
 
-## 📚 Available Tools
+## 🎯 Features
 
-All 35 tools tested and validated:
+**35 AI-Powered Tools** across 8 categories:
 
-| Category | Tools | Status |
-|----------|-------|--------|
-| **Clients** | list, get, create, update, delete | ✅ Tested |
-| **Projects** | list, get, create, update, delete | ✅ Tested |
-| **Tasks** | list, get, create, update, delete | ✅ Tested |
-| **Invoices** | list, get, create, update_status | ✅ Tested |
-| **Leads** | list, get, create, convert | ✅ Tested |
-| **Tickets** | list, get, create, update_status | ✅ Tested |
-| **Estimates** | list, create, convert | ✅ Tested |
-| **Expenses** | list, create | ✅ Tested |
-| **Contracts** | list, create | ✅ Tested |
-| **Dashboard** | get_stats | ✅ Tested |
+### 🧑‍💼 Client Management (5 tools)
+- List, get, create, update, and delete clients
+- Full client lifecycle management
+
+### 📁 Project Management (5 tools)
+- Complete project CRUD operations
+- Project tracking and status updates
+
+### ✏️ Task Management (5 tools)
+- Task creation and tracking
+- Status updates and assignments
+
+### 💰 Invoicing (5 tools)
+- Invoice generation and management
+- Payment tracking
+
+### 🎯 Lead Management (5 tools)
+- Lead tracking and qualification
+- Lead-to-client conversion
+
+### 🎫 Support Tickets (5 tools)
+- Ticket creation and tracking
+- Customer support workflow
+
+### 📋 Estimates (2 tools)
+- Estimate creation and management
+
+### 💸 Expenses (2 tools)
+- Expense tracking and reporting
+
+### 📄 Contracts (1 tool)
+- Contract management
+
+## 🔧 Environment Variables
+
+**Required:**
+- `GROWCRM_API_URL` - Your GROWCRM API endpoint
+- `GROWCRM_API_TOKEN` - Your API authentication token
+
+**Optional:**
+- `GROWCRM_DEFAULT_LIMIT` - Default items per page (default: 50)
+- `GROWCRM_TIMEOUT` - Request timeout in ms (default: 30000)
+
+## 📖 Usage Examples
+
+Ask Claude:
+- "List my GROWCRM clients"
+- "Create a new project called 'Website Redesign'"
+- "Show me all open tickets"
+- "Create an invoice for client X"
+- "What are my pending tasks?"
+
+## 🛠️ Troubleshooting
+
+### MCP server not found
+Verify Node.js is installed (>= 18.0.0):
+```bash
+node --version
+```
+
+### Authentication failed
+Test your API token:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" https://app.ty-dev.fr/api/v1/clients
+```
+
+### Cannot connect
+- Verify `GROWCRM_API_URL` is correct
+- Check your internet connection
+- Ensure GROWCRM instance is accessible
 
 ## 📚 Documentation
 
-- [Quickstart Guide](QUICKSTART.md)
-- [API Documentation](API_REST_GUIDE.md)
-- [Docker Deployment](DOCKER_GUIDE.md)
-- [NPX Usage Guide](ACCES_NPX.md)
-- [Complete Project Documentation](PROJET_COMPLET.md)
-
-## 🧪 Testing
-
-All 35 tools have been systematically tested with real data:
-
-```bash
-# Run tests
-npm test
-
-# Test specific category
-npm test -- clients
-```
-
-See [Mission Accomplie](MISSION_ACCOMPLIE.md) for detailed test results.
-
-## 🔒 Security
-
-- ✅ Laravel Sanctum authentication
-- ✅ Bearer token-based API access
-- ✅ Secure environment variable configuration
-- ✅ No credentials stored in code
-- ✅ HTTPS-only communication
-
-## 🐳 Docker Support
-
-Full Docker support with:
-- Multi-stage builds
-- Alpine Linux (minimal footprint)
-- Health checks
-- Production-ready configuration
-
-See [Docker Guide](DOCKER_GUIDE.md) for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+- **NPM Package**: https://www.npmjs.com/package/growcrm-mcp-server
+- **Full Repository**: https://github.com/Aminetwiti/mcpgrowcrm
+- **Issues**: https://github.com/Aminetwiti/growcrm-mcp-server/issues
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 💬 Support
+## 🤝 Support
 
-- **Issues**: [GitHub Issues](https://github.com/Aminetwiti/mcpgrowcrm/issues)
-- **Email**: support@growcrm.io
-- **Documentation**: [Full Docs](https://github.com/Aminetwiti/mcpgrowcrm)
-
-## 🌟 Acknowledgments
-
-Built with:
-- [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [GROWCRM](https://growcrm.io)
-- [Laravel](https://laravel.com)
-- [Docker](https://docker.com)
-
-## 📊 Stats
-
-- **35** AI-powered tools
-- **8** business categories
-- **100%** test coverage
-- **Production-ready**
+- Open an issue on GitHub
+- Email: support@growcrm.io
+- Documentation: See full repository for detailed guides
 
 ---
 
-**Made with ❤️ by the GROWCRM Team**
-
-[⬆ Back to top](#growcrm-mcp-server)
+**Made with ❤️ for the GROWCRM community**
