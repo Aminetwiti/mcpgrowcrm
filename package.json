@@ -1,10 +1,10 @@
 {
-  "name": "@growcrm/mcp-server",
+  "name": "growcrm-mcp-server",
   "version": "1.0.3",
   "description": "Complete MCP server for GROWCRM - Manage clients, projects, tasks, invoices, leads, tickets, estimates, expenses, and contracts through AI assistants",
   "main": "index.cjs",
   "bin": {
-    "growcrm-mcp": "./index.cjs"
+    "growcrm-mcp": "index.cjs"
   },
   "scripts": {
     "start": "node index.js",

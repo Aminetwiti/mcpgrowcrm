@@ -1,5 +1,5 @@
 {
-  "name": "@growcrm/mcp-server",
+  "name": "growcrm-mcp-server",
   "displayName": "GROWCRM MCP Server",
   "version": "1.0.3",
   "description": "Complete MCP server for GROWCRM - Manage clients, projects, tasks, invoices, leads, tickets, estimates, expenses, and contracts through AI assistants",
