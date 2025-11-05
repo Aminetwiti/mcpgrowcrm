@@ -1,7 +1,23 @@
 # Smithery deployment configuration
 runtime: "container"
 
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+
 startCommand:
-  command: "node"
-  args:
-    - "index.cjs"
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      apiUrl:
+        type: "string"
+        description: "GROWCRM API URL"
+        default: "https://app.ty-dev.fr/api/v1"
+      apiToken:
+        type: "string"
+        description: "GROWCRM API authentication token"
+    required: ["apiToken"]
+  exampleConfig:
+    apiUrl: "https://app.ty-dev.fr/api/v1"
+    apiToken: "your-api-token-here"
