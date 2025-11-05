@@ -1,0 +1,38 @@
+# Documentation volumineuse (garder README.md)
+PROJET_COMPLET.md
+MISSION_ACCOMPLIE.md
+GUIDE_UTILISATION_AI.md
+GESTION_CONTENEURS.md
+
+# Scripts de développement
+docker-deploy.sh
+setup-api.sh
+setup-claude-desktop.sh
+monitor.sh
+
+# Docker (les utilisateurs peuvent récupérer depuis GitHub)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Configuration locale
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
+
+# Logs et tests
+logs/
+*.log
+test-output/
+
+# IDE
+.vscode/
+.idea/
+
+# Fichiers temporaires
+*.tmp
+*.backup
+*.bak
