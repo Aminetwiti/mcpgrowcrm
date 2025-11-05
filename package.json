@@ -1,0 +1,25 @@
+{
+  "name": "@growcrm/mcp-server",
+  "version": "1.0.3",
+  "description": "Serveur MCP pour GROWCRM - Intégration AI complète",
+  "main": "index.cjs",
+  "bin": {
+    "growcrm-mcp": "./index.cjs"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "start-npx": "node index-npx.js"
+  },
+  "keywords": ["mcp", "crm", "growcrm", "ai", "automation"],
+  "author": "GROWCRM Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://app.ty-dev.fr"
+  }
+}

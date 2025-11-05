@@ -1,0 +1,45 @@
+# ============================================================================
+# .dockerignore - Exclure les fichiers inutiles du build Docker
+# ============================================================================
+
+# Dépendances (seront réinstallées)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Fichiers de développement
+*.log
+*.backup
+*.old
+.DS_Store
+.vscode/
+.idea/
+
+# Documentation
+README.md
+QUICKSTART.md
+API_REST_GUIDE.md
+MISSION_ACCOMPLIE.md
+SUMMARY.txt
+INSTALLATION_SUCCESS.txt
+
+# Scripts de développement
+test.js
+demo.js
+test-mcp.js
+test-final.cjs
+*.sh
+
+# Fichiers Git
+.git/
+.gitignore
+.gitattributes
+
+# Fichiers de configuration locale
+.env.local
+.env.development
+
+# Autres
+*.md
+!.env.example

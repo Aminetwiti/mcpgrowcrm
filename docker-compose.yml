@@ -1,0 +1,99 @@
+# ============================================================================
+# DOCKER-COMPOSE - SERVEUR MCP GROWCRM v2.0
+# ============================================================================
+# Configuration complète pour déploiement en production
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # Service principal : Serveur MCP
+  growcrm-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: growcrm-mcp-server
+    restart: "no"
+    stdin_open: true
+    tty: true
+    
+    # Variables d'environnement (à personnaliser)
+    environment:
+      - NODE_ENV=production
+      - DEBUG=false
+      - GROWCRM_BASE_URL=${GROWCRM_BASE_URL:-https://app.ty-dev.fr/api/v1}
+      - AUTH_MODE=${AUTH_MODE:-token}
+      - GROWCRM_API_TOKEN=${GROWCRM_API_TOKEN}
+      - GROWCRM_EMAIL=${GROWCRM_EMAIL}
+      - GROWCRM_PASSWORD=${GROWCRM_PASSWORD}
+    
+    # Charger le fichier .env
+    env_file:
+      - .env
+    
+    # Volumes pour persistance et logs
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./.env:/app/.env:ro
+    
+    # Réseau
+    networks:
+      - growcrm-network
+    
+    # Limites de ressources
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Exposer le port HTTP (optionnel)
+    ports:
+      - "3200:3200"
+    
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    # Logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  growcrm-network:
+    driver: bridge
+    name: growcrm-mcp-network
+
+# ============================================================================
+# COMMANDES UTILES
+# ============================================================================
+#
+# Construire et démarrer :
+#   docker-compose up -d --build
+#
+# Voir les logs :
+#   docker-compose logs -f growcrm-mcp
+#
+# Redémarrer :
+#   docker-compose restart growcrm-mcp
+#
+# Arrêter :
+#   docker-compose down
+#
+# Reconstruire :
+#   docker-compose up -d --build --force-recreate
+#
+# Shell dans le conteneur :
+#   docker-compose exec growcrm-mcp sh
+#
+# ============================================================================

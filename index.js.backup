@@ -1,0 +1,758 @@
+#!/usr/bin/env node
+
+/**
+ * GROWCRM MCP Server
+ * Serveur MCP (Model Context Protocol) pour GROWCRM
+ * Permet aux IA comme ChatGPT, Claude, etc. d'interagir avec votre CRM
+ */
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ErrorCode,
+  McpError
+} from '@modelcontextprotocol/sdk/types.js';
+import axios from 'axios';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Configuration
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '.env') });
+
+const GROWCRM_BASE_URL = process.env.GROWCRM_BASE_URL || 'https://app.ty-dev.fr';
+const AUTH_MODE = process.env.AUTH_MODE || 'credentials';
+const DEBUG = process.env.DEBUG === 'true';
+
+// Client HTTP avec configuration
+const apiClient = axios.create({
+  baseURL: GROWCRM_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest'
+  }
+});
+
+// Session et cookies pour l'authentification
+let sessionCookies = '';
+let csrfToken = '';
+
+/**
+ * Logger pour le debug
+ */
+function log(...args) {
+  if (DEBUG) {
+    console.error('[GROWCRM-MCP]', ...args);
+  }
+}
+
+/**
+ * Authentification auprès de GROWCRM
+ */
+async function authenticate() {
+  try {
+    if (AUTH_MODE === 'token') {
+      // Mode token Sanctum
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${process.env.GROWCRM_API_TOKEN}`;
+      log('Authentification par token configurée');
+      return true;
+    } else {
+      // Mode credentials - authentification via formulaire Laravel
+      log('Tentative d\'authentification...');
+      
+      // 1. Récupérer le token CSRF
+      const loginPageResponse = await apiClient.get('/login');
+      const setCookieHeader = loginPageResponse.headers['set-cookie'];
+      
+      if (setCookieHeader) {
+        sessionCookies = setCookieHeader
+          .map(cookie => cookie.split(';')[0])
+          .join('; ');
+      }
+      
+      // Extraire le CSRF token de la page - plusieurs patterns
+      let tempCsrfToken = null;
+      const patterns = [
+        /name="_token"\s+value="([^"]+)"/,
+        /name='_token'\s+value='([^']+)'/,
+        /<input[^>]*name="_token"[^>]*value="([^"]+)"/,
+        /<meta[^>]*name="csrf-token"[^>]*content="([^"]+)"/
+      ];
+      
+      for (const pattern of patterns) {
+        const match = loginPageResponse.data.match(pattern);
+        if (match) {
+          tempCsrfToken = match[1];
+          break;
+        }
+      }
+      
+      if (tempCsrfToken) {
+        csrfToken = tempCsrfToken;
+      }
+      
+      // 2. Se connecter avec application/x-www-form-urlencoded
+      const loginData = `email=${encodeURIComponent(process.env.GROWCRM_EMAIL)}&password=${encodeURIComponent(process.env.GROWCRM_PASSWORD)}&_token=${csrfToken}`;
+      
+      const loginResponse = await apiClient.post('/login', loginData, {
+        headers: {
+          'Cookie': sessionCookies,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': `${GROWCRM_BASE_URL}/login`
+        },
+        maxRedirects: 5,
+        validateStatus: (status) => status < 500
+      });
+      
+      // Mettre à jour les cookies de session
+      const newCookies = loginResponse.headers['set-cookie'];
+      if (newCookies) {
+        sessionCookies = newCookies
+          .map(cookie => cookie.split(';')[0])
+          .join('; ');
+      }
+      
+      // Configurer les headers par défaut pour les requêtes API
+      apiClient.defaults.headers.common['Cookie'] = sessionCookies;
+      apiClient.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
+      apiClient.defaults.headers.common['Content-Type'] = 'application/json';
+      apiClient.defaults.headers.common['Accept'] = 'application/json';
+      
+      log('Authentification réussie');
+      return true;
+    }
+  } catch (error) {
+    log('Erreur d\'authentification:', error.message);
+    throw new Error('Échec de l\'authentification avec GROWCRM');
+  }
+}
+
+/**
+ * Effectuer une requête API authentifiée
+ */
+async function makeApiRequest(method, path, data = null, retryAuth = true) {
+  try {
+    const config = {
+      method,
+      url: path,
+      headers: {
+        'Cookie': sessionCookies,
+        'X-CSRF-TOKEN': csrfToken
+      }
+    };
+    
+    if (data) {
+      if (method === 'GET') {
+        config.params = data;
+      } else {
+        config.data = data;
+      }
+    }
+    
+    const response = await apiClient.request(config);
+    return response.data;
+  } catch (error) {
+    // Si erreur 401/403 et retry autorisé, réauthentifier
+    if (retryAuth && (error.response?.status === 401 || error.response?.status === 403)) {
+      log('Session expirée, réauthentification...');
+      await authenticate();
+      return makeApiRequest(method, path, data, false);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Définition des outils MCP
+ */
+const TOOLS = [
+  {
+    name: 'list_clients',
+    description: 'Liste tous les clients du CRM avec pagination et filtres',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Numéro de page (par défaut: 1)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Nombre de résultats par page (par défaut: 25)'
+        },
+        search: {
+          type: 'string',
+          description: 'Recherche par nom de client'
+        },
+        category: {
+          type: 'string',
+          description: 'Filtrer par catégorie'
+        }
+      }
+    }
+  },
+  {
+    name: 'get_client',
+    description: 'Obtenir les détails complets d\'un client spécifique',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_id: {
+          type: 'number',
+          description: 'ID du client',
+          required: true
+        }
+      },
+      required: ['client_id']
+    }
+  },
+  {
+    name: 'create_client',
+    description: 'Créer un nouveau client dans le CRM',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_company_name: {
+          type: 'string',
+          description: 'Nom de l\'entreprise',
+          required: true
+        },
+        client_first_name: {
+          type: 'string',
+          description: 'Prénom du contact principal',
+          required: true
+        },
+        client_last_name: {
+          type: 'string',
+          description: 'Nom du contact principal',
+          required: true
+        },
+        client_email: {
+          type: 'string',
+          description: 'Email du contact principal',
+          required: true
+        },
+        client_phone: {
+          type: 'string',
+          description: 'Téléphone'
+        },
+        client_website: {
+          type: 'string',
+          description: 'Site web'
+        },
+        client_address: {
+          type: 'string',
+          description: 'Adresse'
+        },
+        client_city: {
+          type: 'string',
+          description: 'Ville'
+        },
+        client_country: {
+          type: 'string',
+          description: 'Pays'
+        }
+      },
+      required: ['client_company_name', 'client_first_name', 'client_last_name', 'client_email']
+    }
+  },
+  {
+    name: 'list_projects',
+    description: 'Liste tous les projets avec filtres',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Numéro de page'
+        },
+        client_id: {
+          type: 'number',
+          description: 'Filtrer par client'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtrer par statut (not_started, in_progress, on_hold, completed, cancelled)'
+        }
+      }
+    }
+  },
+  {
+    name: 'get_project',
+    description: 'Obtenir les détails d\'un projet',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'number',
+          description: 'ID du projet',
+          required: true
+        }
+      },
+      required: ['project_id']
+    }
+  },
+  {
+    name: 'create_project',
+    description: 'Créer un nouveau projet',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_title: {
+          type: 'string',
+          description: 'Titre du projet',
+          required: true
+        },
+        project_clientid: {
+          type: 'number',
+          description: 'ID du client',
+          required: true
+        },
+        project_description: {
+          type: 'string',
+          description: 'Description du projet'
+        },
+        project_start_date: {
+          type: 'string',
+          description: 'Date de début (YYYY-MM-DD)'
+        },
+        project_deadline: {
+          type: 'string',
+          description: 'Date limite (YYYY-MM-DD)'
+        },
+        project_status: {
+          type: 'string',
+          description: 'Statut: not_started, in_progress, on_hold, completed, cancelled'
+        }
+      },
+      required: ['project_title', 'project_clientid']
+    }
+  },
+  {
+    name: 'list_tasks',
+    description: 'Liste les tâches avec filtres',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Numéro de page'
+        },
+        project_id: {
+          type: 'number',
+          description: 'Filtrer par projet'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtrer par statut'
+        },
+        assigned_to: {
+          type: 'number',
+          description: 'Filtrer par utilisateur assigné'
+        }
+      }
+    }
+  },
+  {
+    name: 'create_task',
+    description: 'Créer une nouvelle tâche',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task_title: {
+          type: 'string',
+          description: 'Titre de la tâche',
+          required: true
+        },
+        task_projectid: {
+          type: 'number',
+          description: 'ID du projet',
+          required: true
+        },
+        task_description: {
+          type: 'string',
+          description: 'Description de la tâche'
+        },
+        task_priority: {
+          type: 'string',
+          description: 'Priorité: low, normal, high, urgent'
+        },
+        task_date_due: {
+          type: 'string',
+          description: 'Date d\'échéance (YYYY-MM-DD)'
+        }
+      },
+      required: ['task_title', 'task_projectid']
+    }
+  },
+  {
+    name: 'list_invoices',
+    description: 'Liste les factures',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Numéro de page'
+        },
+        client_id: {
+          type: 'number',
+          description: 'Filtrer par client'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtrer par statut: draft, unpaid, paid, overdue, cancelled'
+        }
+      }
+    }
+  },
+  {
+    name: 'get_invoice',
+    description: 'Obtenir les détails d\'une facture',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: {
+          type: 'number',
+          description: 'ID de la facture',
+          required: true
+        }
+      },
+      required: ['invoice_id']
+    }
+  },
+  {
+    name: 'list_leads',
+    description: 'Liste les leads/prospects',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Numéro de page'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtrer par statut'
+        },
+        source: {
+          type: 'string',
+          description: 'Filtrer par source'
+        }
+      }
+    }
+  },
+  {
+    name: 'create_lead',
+    description: 'Créer un nouveau lead/prospect',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        lead_firstname: {
+          type: 'string',
+          description: 'Prénom',
+          required: true
+        },
+        lead_lastname: {
+          type: 'string',
+          description: 'Nom',
+          required: true
+        },
+        lead_email: {
+          type: 'string',
+          description: 'Email',
+          required: true
+        },
+        lead_company_name: {
+          type: 'string',
+          description: 'Nom de l\'entreprise'
+        },
+        lead_phone: {
+          type: 'string',
+          description: 'Téléphone'
+        },
+        lead_value: {
+          type: 'number',
+          description: 'Valeur estimée'
+        }
+      },
+      required: ['lead_firstname', 'lead_lastname', 'lead_email']
+    }
+  },
+  {
+    name: 'list_tickets',
+    description: 'Liste les tickets de support',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Numéro de page'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtrer par statut: open, closed, pending'
+        },
+        priority: {
+          type: 'string',
+          description: 'Filtrer par priorité'
+        }
+      }
+    }
+  },
+  {
+    name: 'create_ticket',
+    description: 'Créer un nouveau ticket de support',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ticket_subject: {
+          type: 'string',
+          description: 'Sujet du ticket',
+          required: true
+        },
+        ticket_message: {
+          type: 'string',
+          description: 'Message du ticket',
+          required: true
+        },
+        ticket_clientid: {
+          type: 'number',
+          description: 'ID du client',
+          required: true
+        },
+        ticket_priority: {
+          type: 'string',
+          description: 'Priorité: low, normal, high, urgent'
+        }
+      },
+      required: ['ticket_subject', 'ticket_message', 'ticket_clientid']
+    }
+  },
+  {
+    name: 'get_dashboard_stats',
+    description: 'Obtenir les statistiques du dashboard',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        year: {
+          type: 'number',
+          description: 'Année pour les statistiques (par défaut: année courante)'
+        }
+      }
+    }
+  },
+  {
+    name: 'search_global',
+    description: 'Recherche globale dans tout le CRM',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Terme de recherche',
+          required: true
+        },
+        type: {
+          type: 'string',
+          description: 'Type de recherche: all, clients, projects, tasks, invoices, leads, tickets'
+        }
+      },
+      required: ['query']
+    }
+  }
+];
+
+/**
+ * Gestionnaires d'outils
+ */
+async function handleToolCall(name, args) {
+  log(`Appel outil: ${name}`, args);
+  
+  switch (name) {
+    case 'list_clients':
+      return await makeApiRequest('GET', '/clients/search', {
+        page: args.page || 1,
+        limit: args.limit || 25,
+        search: args.search,
+        filter_category: args.category
+      });
+      
+    case 'get_client':
+      return await makeApiRequest('GET', `/clients/${args.client_id}`);
+      
+    case 'create_client':
+      return await makeApiRequest('POST', '/clients', args);
+      
+    case 'list_projects':
+      return await makeApiRequest('GET', '/projects/search', {
+        page: args.page || 1,
+        filter_client: args.client_id,
+        filter_status: args.status
+      });
+      
+    case 'get_project':
+      return await makeApiRequest('GET', `/projects/${args.project_id}`);
+      
+    case 'create_project':
+      return await makeApiRequest('POST', '/projects', args);
+      
+    case 'list_tasks':
+      return await makeApiRequest('GET', '/tasks/search', {
+        page: args.page || 1,
+        filter_project: args.project_id,
+        filter_status: args.status,
+        filter_assigned: args.assigned_to
+      });
+      
+    case 'create_task':
+      return await makeApiRequest('POST', '/tasks', args);
+      
+    case 'list_invoices':
+      return await makeApiRequest('GET', '/invoices/search', {
+        page: args.page || 1,
+        filter_client: args.client_id,
+        filter_status: args.status
+      });
+      
+    case 'get_invoice':
+      return await makeApiRequest('GET', `/invoices/${args.invoice_id}`);
+      
+    case 'list_leads':
+      return await makeApiRequest('GET', '/leads/search', {
+        page: args.page || 1,
+        filter_status: args.status,
+        filter_source: args.source
+      });
+      
+    case 'create_lead':
+      return await makeApiRequest('POST', '/leads', args);
+      
+    case 'list_tickets':
+      return await makeApiRequest('GET', '/tickets/search', {
+        page: args.page || 1,
+        filter_status: args.status,
+        filter_priority: args.priority
+      });
+      
+    case 'create_ticket':
+      return await makeApiRequest('POST', '/tickets', args);
+      
+    case 'get_dashboard_stats':
+      return await makeApiRequest('GET', '/home', {
+        year: args.year || new Date().getFullYear()
+      });
+      
+    case 'search_global':
+      return await makeApiRequest('GET', '/search', {
+        search_query: args.query,
+        search_type: args.type || 'all'
+      });
+      
+    default:
+      throw new McpError(
+        ErrorCode.MethodNotFound,
+        `Outil inconnu: ${name}`
+      );
+  }
+}
+
+/**
+ * Initialisation du serveur MCP
+ */
+async function main() {
+  log('Démarrage du serveur MCP GROWCRM...');
+  
+  // Authentification initiale
+  try {
+    await authenticate();
+  } catch (error) {
+    console.error('Erreur d\'authentification:', error.message);
+    console.error('Vérifiez votre configuration dans le fichier .env');
+    process.exit(1);
+  }
+  
+  // Création du serveur MCP
+  const server = new Server(
+    {
+      name: 'growcrm-mcp-server',
+      version: '1.0.0'
+    },
+    {
+      capabilities: {
+        tools: {}
+      }
+    }
+  );
+  
+  // Gestionnaire: Liste des outils
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: TOOLS
+  }));
+  
+  // Gestionnaire: Appel d'outil
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    try {
+      const result = await handleToolCall(request.params.name, request.params.arguments || {});
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      log('Erreur lors de l\'appel d\'outil:', error);
+      
+      if (error instanceof McpError) {
+        throw error;
+      }
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error: true,
+              message: error.message,
+              details: error.response?.data || null
+            }, null, 2)
+          }
+        ],
+        isError: true
+      };
+    }
+  });
+  
+  // Démarrage du transport
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  
+  log('Serveur MCP GROWCRM démarré avec succès!');
+}
+
+// Gestion des erreurs non capturées
+process.on('uncaughtException', (error) => {
+  console.error('Erreur non capturée:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (error) => {
+  console.error('Promise rejetée:', error);
+  process.exit(1);
+});
+
+// Lancement
+main().catch((error) => {
+  console.error('Erreur fatale:', error);
+  process.exit(1);
+});
