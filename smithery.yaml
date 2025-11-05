@@ -1,2 +1,7 @@
 # Smithery deployment configuration
-runtime: "node"
+runtime: "container"
+
+startCommand:
+  command: "node"
+  args:
+    - "index.cjs"
