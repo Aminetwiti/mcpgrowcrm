@@ -386,7 +386,18 @@ const TOOLS = [
         estimate_clientid: { type: 'number', description: 'ID du client' },
         estimate_date: { type: 'string', description: 'Date du devis (YYYY-MM-DD)' },
         estimate_expiry_date: { type: 'string', description: "Date d'expiration (YYYY-MM-DD)" },
-        items: { type: 'array', description: 'Liste des lignes du devis' }
+        items: { 
+          type: 'array', 
+          description: 'Liste des lignes du devis',
+          items: {
+            type: 'object',
+            properties: {
+              description: { type: 'string', description: 'Description de la ligne' },
+              rate: { type: 'number', description: 'Prix unitaire' },
+              quantity: { type: 'number', description: 'Quantité' }
+            }
+          }
+        }
       },
       required: ['estimate_clientid']
     }
