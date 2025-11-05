@@ -1,7 +1,7 @@
 {
   "name": "@growcrm/mcp-server",
   "version": "1.0.3",
-  "description": "Serveur MCP pour GROWCRM - Intégration AI complète",
+  "description": "Complete MCP server for GROWCRM - Manage clients, projects, tasks, invoices, leads, tickets, estimates, expenses, and contracts through AI assistants",
   "main": "index.cjs",
   "bin": {
     "growcrm-mcp": "./index.cjs"
@@ -10,16 +10,38 @@
     "start": "node index.js",
     "start-npx": "node index-npx.js"
   },
-  "keywords": ["mcp", "crm", "growcrm", "ai", "automation"],
-  "author": "GROWCRM Team",
+  "keywords": [
+    "mcp",
+    "crm",
+    "growcrm",
+    "ai",
+    "automation",
+    "project-management",
+    "invoicing",
+    "lead-management",
+    "ticket-system",
+    "business-automation"
+  ],
+  "author": {
+    "name": "GROWCRM Team",
+    "email": "support@growcrm.io",
+    "url": "https://app.ty-dev.fr"
+  },
   "license": "MIT",
+  "homepage": "https://github.com/Aminetwiti/mcpgrowcrm",
+  "bugs": {
+    "url": "https://github.com/Aminetwiti/mcpgrowcrm/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aminetwiti/mcpgrowcrm.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "axios": "^1.7.9",
     "dotenv": "^16.4.7"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://app.ty-dev.fr"
   }
 }
